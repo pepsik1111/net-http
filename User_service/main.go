@@ -1,4 +1,3 @@
-// services/user-service/main.go
 package main
 
 import (

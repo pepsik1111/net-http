@@ -1,0 +1,10 @@
+services:
+  user_service:
+    build: ./User_service
+    ports:
+      - "8081:8081"
+
+  car_service:
+    build: ./Car_service
+    ports:
+      - "8082:8082"

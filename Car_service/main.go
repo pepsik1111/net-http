@@ -2,92 +2,39 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 )
 
-type User struct {
-	IDuser   int    `json:"id_user"`
-	Name     string `json:"name"`
-	Mail     string `json:"mail"`
-	IDorders []int  `json:"id_orders,omitempty"`
+type CarResponse struct {
+	Brand     string `json:"brand"`
+	OwnerName string `json:"owner_name"` // Эти данные мы получим от другого сервиса
 }
 
-var NextIDUser = 1
-
-type Car struct {
-	Brand  string `json:"brand"`
-	Number string `json:"number"`
-}
-
-type Order struct {
-}
-
-var users []User
-var cars []Car
-
-func createCar(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Метот не поддерживается", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var newCar Car
-
-	err := json.NewDecoder(r.Body).Decode(&newCar)
+func getCarInfo(w http.ResponseWriter, r *http.Request) {
+	resp, err := http.Get("http://user-service:8081/internal/user?id=1")
 	if err != nil {
-		http.Error(w, "Ошибка в json", http.StatusBadRequest)
+		http.Error(w, "User service unavailable", http.StatusServiceUnavailable)
 		return
 	}
+	defer resp.Body.Close()
 
-	cars = append(cars, newCar)
+	// 2. Распаковываем ответ от User Service
+	var user struct {
+		Name string `json:"name"`
+	}
+	json.NewDecoder(resp.Body).Decode(&user)
 
-	fmt.Printf("Добваленна новая машина %+v\n", newCar)
+	// 3. Формируем общий ответ
+	result := CarResponse{
+		Brand:     "Tesla",
+		OwnerName: user.Name,
+	}
 
-	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("Машина упешно создана\n"))
-
-}
-
-func getCar(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(cars)
-
-}
-
-func createUser(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var newUser User
-	err := json.NewDecoder(r.Body).Decode(&newUser)
-	if err != nil {
-		http.Error(w, "ошибка json", http.StatusBadRequest)
-		return
-	}
-	users = append(users, newUser)
-
-	fmt.Printf("Добавлен польователь %+v\n", newUser)
-
-	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("Пользователь создан\n"))
-
-}
-
-func getUser(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(users)
+	json.NewEncoder(w).Encode(result)
 }
 
 func main() {
-	http.HandleFunc("/user", getUser)
-
-	println("Сервер запущен на http://localhost:8080/car")
-
-	http.HandleFunc("/car", getCar)
-	http.HandleFunc("/car/create", createCar)
-	http.HandleFunc("/user/create", createUser)
-	http.ListenAndServe(":8080", nil)
+	http.HandleFunc("/car-details", getCarInfo)
+	http.ListenAndServe(":8082", nil)
 }
